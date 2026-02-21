@@ -1,0 +1,89 @@
+version: '3.8'
+
+# =====================================================================
+# Docker Compose - Système de Gestion Hospitalière Microservices
+# =====================================================================
+# Démarrage : docker-compose up --build
+# Arrêt     : docker-compose down
+# =====================================================================
+
+services:
+
+  # ── 1. Eureka Server (démarrer EN PREMIER) ────────────────────────
+  eureka-server:
+    build: ./eureka-server
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 10s
+      retries: 5
+
+  # ── 2. Config Server ──────────────────────────────────────────────
+  config-server:
+    build: ./config-server
+    container_name: config-server
+    ports:
+      - "8888:8888"
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+
+  # ── 3. Patient Service ────────────────────────────────────────────
+  patient-service:
+    build: ./patient-service
+    container_name: patient-service
+    ports:
+      - "8081:8081"
+    depends_on:
+      - eureka-server
+      - config-server
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+
+  # ── 4. Appointment Service ────────────────────────────────────────
+  appointment-service:
+    build: ./appointment-service
+    container_name: appointment-service
+    ports:
+      - "8082:8082"
+    depends_on:
+      - eureka-server
+      - config-server
+      - patient-service
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+
+  # ── 5. Medical Record Service ─────────────────────────────────────
+  medical-record-service:
+    build: ./medical-record-service
+    container_name: medical-record-service
+    ports:
+      - "8083:8083"
+    depends_on:
+      - eureka-server
+      - config-server
+      - patient-service
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+
+  # ── 6. API Gateway (démarrer EN DERNIER) ─────────────────────────
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    ports:
+      - "8080:8080"    # SEUL port exposé aux clients
+    depends_on:
+      - eureka-server
+      - patient-service
+      - appointment-service
+      - medical-record-service
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888

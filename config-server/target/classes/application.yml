@@ -1,0 +1,26 @@
+server:
+  port: 8888  # Port standard du Config Server
+
+spring:
+  application:
+    name: config-server
+
+  cloud:
+    config:
+      server:
+        # Mode "native" : lit les fichiers de config depuis le système local
+        # En production, remplacer par un dépôt Git :
+        # git:
+        #   uri: https://github.com/votre-repo/hospital-config
+        native:
+          search-locations: classpath:/config  # Cherche dans src/main/resources/config/
+
+  profiles:
+    active: native  # Active le mode fichiers locaux
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true

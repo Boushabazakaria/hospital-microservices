@@ -1,0 +1,77 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: appointment-service
+  config:
+    import: optional:configserver:http://localhost:8888
+
+  datasource:
+    url: jdbc:h2:mem:appointmentdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    database-platform: org.hibernate.dialect.H2Dialect
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  # Activer le fallback Feign avec Resilience4j
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true  # Active l'intégration Feign + Circuit Breaker
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+
+# ===== CONFIGURATION RESILIENCE4J =====
+resilience4j:
+
+  # Circuit Breaker : interrompt les appels si trop d'erreurs
+  circuitbreaker:
+    instances:
+      patientService:
+        # Ouvre le circuit si 50% des 5 derniers appels échouent
+        failure-rate-threshold: 50
+        # Nombre d'appels minimum avant évaluation
+        minimum-number-of-calls: 5
+        # Attente avant de tester à nouveau (état HALF-OPEN)
+        wait-duration-in-open-state: 10s
+        # Nombre d'appels en état HALF-OPEN pour tester la récupération
+        permitted-number-of-calls-in-half-open-state: 3
+        sliding-window-size: 10
+        sliding-window-type: COUNT_BASED
+
+  # Retry : réessaie automatiquement en cas d'échec ponctuel
+  retry:
+    instances:
+      patientService:
+        max-attempts: 3          # Maximum 3 tentatives
+        wait-duration: 1s        # Attente entre les tentatives
+        retry-exceptions:
+          - java.io.IOException
+          - feign.FeignException
+
+  # Timeout : évite les appels qui traînent trop longtemps
+  timelimiter:
+    instances:
+      patientService:
+        timeout-duration: 3s    # Abandonne après 3 secondes
+
+logging:
+  level:
+    com.hospital: DEBUG
+    io.github.resilience4j: DEBUG

@@ -1,0 +1,15 @@
+# Configuration partagée entre tous les microservices
+# Ce fichier est lu automatiquement par tous les services enregistrés
+
+# URL Eureka commune à tous
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+
+# Logs communs
+logging:
+  level:
+    com.hospital: DEBUG

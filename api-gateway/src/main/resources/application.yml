@@ -1,0 +1,93 @@
+server:
+  port: 8085  # Port unique de la Gateway - TOUS les clients passent par ici
+
+spring:
+  application:
+    name: api-gateway
+  config:
+    import: optional:configserver:http://localhost:8888
+
+  cloud:
+    gateway:
+      # ===== ROUTES DE L'API GATEWAY =====
+      # Chaque route définit : quelles URLs → quel microservice
+      # "lb://" = Load Balanced → résolution via Eureka
+      routes:
+
+        # ── Route 1 : Patient Service ──────────────────────────────────────
+        - id: patient-service-route
+          uri: lb://patient-service       # "patient-service" = spring.application.name du Patient Service
+          predicates:
+            - Path=/api/patients/**       # Toute URL commençant par /api/patients/
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: patientServiceCB
+                fallbackUri: forward:/fallback/patient  # Redirection en cas de panne
+
+        # ── Route 2 : Appointment Service ──────────────────────────────────
+        - id: appointment-service-route
+          uri: lb://appointment-service
+          predicates:
+            - Path=/api/appointments/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: appointmentServiceCB
+                fallbackUri: forward:/fallback/appointment
+
+        # ── Route 3 : Medical Record Service ───────────────────────────────
+        - id: medical-record-service-route
+          uri: lb://medical-record-service
+          predicates:
+            - Path=/api/medical-records/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: medicalServiceCB
+                fallbackUri: forward:/fallback/medical
+
+      # Activer le load balancing automatique via Eureka
+      discovery:
+        locator:
+          enabled: true               # Permet la découverte automatique des services
+          lower-case-service-id: true
+
+# Eureka Client
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+
+# Resilience4j pour la Gateway
+resilience4j:
+  circuitbreaker:
+    instances:
+      patientServiceCB:
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        sliding-window-size: 5
+      appointmentServiceCB:
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        sliding-window-size: 5
+      medicalServiceCB:
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        sliding-window-size: 5
+
+  timelimiter:
+    instances:
+      patientServiceCB:
+        timeout-duration: 5s
+      appointmentServiceCB:
+        timeout-duration: 5s
+      medicalServiceCB:
+        timeout-duration: 5s
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    com.hospital: DEBUG
